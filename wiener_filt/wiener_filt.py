@@ -5,8 +5,16 @@ from scipy import signal
 
 
 def gaussian_kern(size=6, std=1):
-    g = signal.gaussian(size, std=std).reshape(size, 1)
-    re = np.outer(g, g)
+    if type(size) == tuple:
+        x = size[0]
+        y = size[1]
+        gx = signal.gaussian(x, std=std).reshape(x, 1)
+        gy = signal.gaussian(y, std=std).reshape(y, 1)
+        re = np.outer(gx, gy)
+    else:
+        x = size
+        g = signal.gaussian(x, std=std).reshape(x, 1)
+        re = np.outer(g, g)
     return re / np.sum(re)
 
 
@@ -17,11 +25,11 @@ def get_idx(r, c):
     return np.vstack((rc.flatten(), cc.flatten()))
 
 
-def gaussian_blur(path='./in.jpg'):
+def gaussian_blur(path='in.jpg'):
     im = cv.imread(path).astype(np.float64) / 255
     nim = np.zeros_like(im)
 
-    k = gaussian_kern(7,5)
+    k = gaussian_kern(7, 5)
     kidx = get_idx(k.shape[0], k.shape[1])
     kidx -= (np.array(k.shape) // 2).reshape(-1, 1)
 
@@ -29,13 +37,10 @@ def gaussian_blur(path='./in.jpg'):
     nidx = nidx.reshape(nim.shape[0], nim.shape[1], -1, 1)
 
     nca = nidx + kidx.reshape(1, 1, kidx.shape[0], kidx.shape[1])
-
     nca = np.where(nca < 0, 0, nca)
-
     nca = np.where(np.stack((nca[:, :, 0] < nim.shape[0], nca[:, :, 1] < nim.shape[1]), axis=2),
                    nca,
                    np.array([nim.shape[0] - 1, nim.shape[1] - 1]).reshape(1, 1, 2, 1))
-
     nim = np.sum(im[nca[:, :, 0], nca[:, :, 1]] * k.flatten().reshape(1, 1, -1, 1), axis=2)
 
     cv.imshow('test', im)
@@ -44,4 +49,24 @@ def gaussian_blur(path='./in.jpg'):
     cv.waitKey(0)
 
 
-gaussian_blur()
+def gaussian_blur_fast(path='in.jpg'):
+    im = cv.imread(path).astype(np.float64) / 255
+    imf = np.fft.fft2(im)
+
+    # k = np.zeros((im.shape[0],im.shape[1]))
+    # k[:16,:16] = gaussian_kern(size=16, std=5)
+
+    k = gaussian_kern((im.shape[0], im.shape[1]), 1)
+    kf = np.fft.fft2(k).reshape(k.shape[0], k.shape[1], 1)
+
+    nim = np.fft.ifft2(imf * kf)
+
+    cv.imshow('k', k / np.max(k))
+    cv.imshow('kf', np.abs(kf))
+    cv.imshow('im', im)
+    cv.imshow('nim', np.abs(nim))
+    cv.waitKey(0)
+    pass
+
+
+gaussian_blur_fast()
