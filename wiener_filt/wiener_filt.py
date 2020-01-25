@@ -29,7 +29,7 @@ def gaussian_blur(path='in.jpg'):
     im = cv.imread(path).astype(np.float64) / 255
     nim = np.zeros_like(im)
 
-    k = gaussian_kern(7, 5)
+    k = gaussian_kern(9, 3)
     kidx = get_idx(k.shape[0], k.shape[1])
     kidx -= (np.array(k.shape) // 2).reshape(-1, 1)
 
@@ -51,22 +51,23 @@ def gaussian_blur(path='in.jpg'):
 
 def gaussian_blur_fast(path='in.jpg'):
     im = cv.imread(path).astype(np.float64) / 255
-    imf = np.fft.fft2(im)
+    imf = np.fft.fft2(im, axes=(0, 1))
 
-    # k = np.zeros((im.shape[0],im.shape[1]))
-    # k[:16,:16] = gaussian_kern(size=16, std=5)
+    k = gaussian_kern((im.shape[0], im.shape[1]), 3)
+    kf = np.fft.fft2(k)
 
-    k = gaussian_kern((im.shape[0], im.shape[1]), 1)
-    kf = np.fft.fft2(k).reshape(k.shape[0], k.shape[1], 1)
+    kf = np.expand_dims(kf, 2)
 
-    nim = np.fft.ifft2(imf * kf)
+    nim = imf * kf
+    nim = np.fft.ifftshift(np.fft.ifft2(nim, axes=(0, 1)), axes=(0, 1)).real
 
-    cv.imshow('k', k / np.max(k))
-    cv.imshow('kf', np.abs(kf))
     cv.imshow('im', im)
-    cv.imshow('nim', np.abs(nim))
     cv.waitKey(0)
+    cv.imshow('nim', nim)
+    cv.waitKey(0)
+
     pass
 
 
+gaussian_blur()
 gaussian_blur_fast()
