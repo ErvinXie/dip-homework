@@ -1,73 +1,73 @@
 import numpy as np
 import cv2 as cv
-import matplotlib.pyplot as plt
 from scipy import signal
 
 
+# 给一个size，返回对应的高斯核
 def gaussian_kern(size=6, std=1):
     if type(size) == tuple:
-        x = size[0]
-        y = size[1]
-        gx = signal.gaussian(x, std=std).reshape(x, 1)
-        gy = signal.gaussian(y, std=std).reshape(y, 1)
-        re = np.outer(gx, gy)
+        gx = signal.gaussian(size[0], std=std).reshape(size[0], 1)
+        gy = signal.gaussian(size[1], std=std).reshape(size[1], 1)
     else:
-        x = size
-        g = signal.gaussian(x, std=std).reshape(x, 1)
-        re = np.outer(g, g)
+        gx = signal.gaussian(size, std=std).reshape(size, 1)
+        gy = np.copy(gx)
+    re = np.outer(gx, gy)
     return re / np.sum(re)
 
 
-# plt.imshow(gaussian_kern(),interpolation='none')
-# plt.show()
-def get_idx(r, c):
-    cc, rc = np.meshgrid(np.arange(c), np.arange(r))
-    return np.vstack((rc.flatten(), cc.flatten()))
-
-
-def gaussian_blur(path='in.jpg'):
-    im = cv.imread(path).astype(np.float64) / 255
-    nim = np.zeros_like(im)
-
-    k = gaussian_kern(9, 3)
-    kidx = get_idx(k.shape[0], k.shape[1])
-    kidx -= (np.array(k.shape) // 2).reshape(-1, 1)
-
-    nidx = get_idx(nim.shape[0], nim.shape[1]).T
-    nidx = nidx.reshape(nim.shape[0], nim.shape[1], -1, 1)
-
-    nca = nidx + kidx.reshape(1, 1, kidx.shape[0], kidx.shape[1])
-    nca = np.where(nca < 0, 0, nca)
-    nca = np.where(np.stack((nca[:, :, 0] < nim.shape[0], nca[:, :, 1] < nim.shape[1]), axis=2),
-                   nca,
-                   np.array([nim.shape[0] - 1, nim.shape[1] - 1]).reshape(1, 1, 2, 1))
-    nim = np.sum(im[nca[:, :, 0], nca[:, :, 1]] * k.flatten().reshape(1, 1, -1, 1), axis=2)
-
-    cv.imshow('test', im)
-    cv.waitKey(0)
-    cv.imshow('test', nim)
-    cv.waitKey(0)
-
-
-def gaussian_blur_fast(path='in.jpg'):
-    im = cv.imread(path).astype(np.float64) / 255
+# 高斯模糊
+def gaussian_blur_fft(im, std=3):
     imf = np.fft.fft2(im, axes=(0, 1))
 
-    k = gaussian_kern((im.shape[0], im.shape[1]), 3)
+    k = gaussian_kern((im.shape[0], im.shape[1]), std)
     kf = np.fft.fft2(k)
-
     kf = np.expand_dims(kf, 2)
 
     nim = imf * kf
     nim = np.fft.ifftshift(np.fft.ifft2(nim, axes=(0, 1)), axes=(0, 1)).real
 
-    cv.imshow('im', im)
-    cv.waitKey(0)
-    cv.imshow('nim', nim)
-    cv.waitKey(0)
-
-    pass
+    return nim
 
 
-gaussian_blur()
-gaussian_blur_fast()
+# 高斯噪声
+def noise(im, std=0.5):
+    im += np.random.randn(im.shape[0], im.shape[1], im.shape[2]) * std
+    return im
+
+
+# 预估维纳滤波中信噪比的倒数
+def estimate_snr(im, std=0.5):
+    n = np.random.randn(im.shape[0], im.shape[1], im.shape[2]) * std
+    return np.sum(n ** 2) / np.sum(im ** 2)
+
+
+# 维纳滤波
+def weiner_filt(im, std=3):
+    snr = estimate_snr(im, 0.1)
+    print(snr)
+    imf = np.fft.fft2(im, axes=(0, 1))
+    H = gaussian_kern((im.shape[0], im.shape[1]), std)
+    H = np.fft.fft2(H)
+    G = np.conjugate(H) / (np.conjugate(H) * H + snr)
+    G = np.expand_dims(G, 2)
+    nim = imf * G
+    nim = np.fft.ifftshift(np.fft.ifft2(nim, axes=(0, 1)), axes=(0, 1)).real
+    return nim
+
+
+# 读取图片
+im = cv.imread('in.jpg').astype(np.float64) / 255
+# 加高斯模糊
+im = gaussian_blur_fft(im, 3)
+# 加高斯噪声
+im = noise(im, 0.1)
+# 显示并存储模糊图片
+cv.imshow('im', im)
+cv.waitKey(0)
+cv.imwrite('blurred.jpg',im*255)
+# 维纳滤波
+im = weiner_filt(im, 3)
+# 显示并存储滤波之后的图片
+cv.imshow('im', im)
+cv.waitKey(0)
+cv.imwrite('out.jpg', im * 255)
