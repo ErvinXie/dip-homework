@@ -1,5 +1,8 @@
 # 代码阅读实验报告
 07111701班 1120172150 谢威宇
+
+2020.1.24
+
 ## 实验环境
 - macOS Catalina 10.15.2
 - CLion 2019.3.3
@@ -66,6 +69,8 @@
 - 先运行，查看效果，显示的四张图片如下图。
 
   ![results](results.png)
+
+## 整体分析和主要算法解读
 
 - 继续阅读代码，首先使用一个result矩阵来存储所有的运算结果
 
@@ -422,3 +427,16 @@ namespace blend {
 ## 算法流程图
 
 ![process](process.png)
+
+## 模块功能和接口说明
+
+和seamless cloning有关的就三个模块，分别为seamless_cloning.cpp、clone.cpp和poisson_solver.cpp三个模块。
+
+seamless cloning多次调用clone中seamlessClone函数，通过传入不同的参数来确定引导场的计算类型，调用完成之后得到计算好的图片。
+
+clone自己的seamlessClone按照不同引导场类型调用自己的函数，计算完成之后返回。然后调用poisson solver解泊松方程，得到解之后返回给seamless cloning。
+
+poisson solver就单独解泊松方程就完成任务了。
+
+
+
